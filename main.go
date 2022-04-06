@@ -1,15 +1,17 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
+	// built-in
+	"log"
 	"net/http"
 	"net/smtp"
 	"os"
-	"text/template"
 
-	"github.com/gin-contrib/cors"
+	// "text/template"
+
+	// 3rd party packages
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 // Global Variables
@@ -21,10 +23,7 @@ var emailHost string
 var emailPort string
 var emailAddress string
 
-// POST route @/email
-// cc to optional email
-// accept JSON
-// format using HTML template
+// [ ] format using HTML template
 
 type email struct {
 	CC string `json:"cc"`
@@ -32,65 +31,66 @@ type email struct {
 	Message string `json:"message"`
 }
 
-func sendEmail(c* gin.Context) {
+type response struct {
+	email
+	Success string `json:"success"`
+}
+
+
+func handleEmail(c* gin.Context) {
 	var newEmail email
 	
 	if err := c.BindJSON(&newEmail); err != nil {
 		return
 	}
-
-	// parse CC email
-	// validCC,ccError := mail.ParseAddress(newEmail.CC)
-	// if ccError != nil { return }
-
-	var emailSubject bytes.Buffer
-	subjectFilter, _ := template.New("").Parse("Subject: Email from {.}\r\n")
-	_ = subjectFilter.Execute(&emailSubject, newEmail.Name)
-	emailMime := "MIME-version: 1.0\r\n"
-
-	newLine := "\r\n"
-
-	emailHeading := []byte(
-		"From: Stephan Randle <" + emailFrom + ">" + newLine +
-		"To: Stephan Randle <" + emailTo + ">" + newLine +
-		"CC: " + newEmail.CC + newLine +
-		"Subject: " + newEmail.Name + newLine)
-
-	emailMessage := []byte(emailSubject.String() + emailMime + newEmail.Message)
-
 	
-	smtp.SendMail(
+	// address, auth, from, to, message
+	if err := smtp.SendMail(
 		emailAddress,
 		auth,
 		emailFrom,
-		[]string{emailFrom},
-		emailMessage)
-		
-	fmt.Println(emailHeading)
+		[]string{emailTo},
+		[]byte("Hello World")); err != nil{
+			// failed to send email message
+			log.Fatal(err)
+			c.IndentedJSON(http.StatusBadRequest, response{
+				email: newEmail, 
+				Success: "failed"})
+		}
 
 	// return original body
 	c.IndentedJSON(http.StatusAccepted, newEmail)
 }
 
 func main(){
-	router := gin.Default()
-
-	// authenticate server
-	auth = smtp.PlainAuth("", emailFrom, emailPass, emailHost)
-	// load / configure environment variables
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	
+	// Configure environment variables / global variables
 	emailTo = os.Getenv("TO_ADDR")
 	emailFrom = os.Getenv("FROM_ADDR")
 	emailPass = os.Getenv("FROM_PASS")
 	emailHost = os.Getenv("SMTP_HOST")
 	emailPort = os.Getenv("SMTP_PORT")
 	emailAddress = emailHost + ":" + emailPort
+	
+	// Authenticate server
+	auth = smtp.PlainAuth("", emailFrom, emailPass, emailHost)
+	
+	// Gin configuration
+	router := gin.Default()
+	
+	// // router.Use(cors.New(cors.Config{
+	// // 	AllowOrigins: []string{os.Getenv("ALLOWED_ORIGIN"),"http://"},
+	// // 	AllowMethods: []string{"POST"},
+	// // 	AllowOriginFunc: func(origin string) bool {
+    // //         return origin == "https://github.com"
+    // //     },
+	// // }))
 
-	router.Use(cors.New(cors.Config{
-		AllowOrigins: []string{os.Getenv("ALLOWED_ORIGIN")},
-		AllowMethods: []string{"POST"},
-	}))
+	router.POST("/email", handleEmail)
 
-	router.POST("/email", sendEmail)
-
-	router.Run(os.Getenv("PORT"))
+	router.Run(":" + os.Getenv("PORT"))
 }
