@@ -53,7 +53,7 @@ func handleEmail(c* gin.Context) {
 		emailAddress,
 		auth,
 		emailFrom,
-		[]string{newEmail.Name},
+		[]string{emailTo},
 		[]byte("Hello World")); err != nil{
 			// handle failing to send email message
 			log.Fatal(err)
