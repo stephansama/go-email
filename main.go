@@ -23,8 +23,6 @@ var emailHost string
 var emailPort string
 var emailAddress string
 
-// [ ] format using HTML template
-
 type email struct {
 	CC string `json:"cc"`
 	Name string `json:"name"`
@@ -36,6 +34,9 @@ type response struct {
 	Success string `json:"success"`
 }
 
+func helloWorld(c* gin.Context){
+	c.String(http.StatusOK, "hello world")
+}
 
 func handleEmail(c* gin.Context) {
 	var newEmail email
@@ -43,15 +44,18 @@ func handleEmail(c* gin.Context) {
 	if err := c.BindJSON(&newEmail); err != nil {
 		return
 	}
+
+	// load email heading
+	// load email body
 	
 	// address, auth, from, to, message
 	if err := smtp.SendMail(
 		emailAddress,
 		auth,
 		emailFrom,
-		[]string{emailTo},
+		[]string{newEmail.Name},
 		[]byte("Hello World")); err != nil{
-			// failed to send email message
+			// handle failing to send email message
 			log.Fatal(err)
 			c.IndentedJSON(http.StatusBadRequest, response{
 				email: newEmail, 
@@ -59,7 +63,9 @@ func handleEmail(c* gin.Context) {
 		}
 
 	// return original body
-	c.IndentedJSON(http.StatusAccepted, newEmail)
+	c.IndentedJSON(http.StatusAccepted, response{
+		email: newEmail,
+		Success: "success"})
 }
 
 func main(){
@@ -90,6 +96,7 @@ func main(){
     // //     },
 	// // }))
 
+	router.GET("/", helloWorld)
 	router.POST("/email", handleEmail)
 
 	router.Run(":" + os.Getenv("PORT"))
